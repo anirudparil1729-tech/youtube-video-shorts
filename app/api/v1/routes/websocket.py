@@ -2,16 +2,17 @@
 WebSocket routes for real-time job progress updates.
 """
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException
-from typing import Dict, Set, List
-import json
 import asyncio
+import json
 import logging
 from datetime import datetime
+from typing import Dict, Set
 
-from app.services.queue import job_queue
+from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+
 from app.db.database import get_session
 from app.models.job_models import Job
+from app.services.queue import job_queue
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
