@@ -1,0 +1,56 @@
+# Core FastAPI and web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+sqlmodel>=0.0.16
+pydantic>=2.5.0
+python-multipart>=0.0.6
+
+# Database
+sqlalchemy>=2.0.0
+
+# Video and audio processing
+yt-dlp>=2023.12.30
+ffmpeg-python>=0.2.0
+
+# AI/ML libraries
+openai-whisper>=20231117
+spacy>=3.7.2
+transformers>=4.36.0
+torch>=2.0.0
+torchaudio>=2.0.0
+
+# Computer vision
+opencv-python-headless>=4.8.1
+
+# Async support
+asyncio-mqtt>=0.16.0
+redis>=5.0.1
+
+# HTTP client
+httpx>=0.25.2
+
+# Utilities
+python-dateutil>=2.8.0
+pytz>=2023.3
+click>=8.1.0
+rich>=13.0.0
+
+# File processing
+pillow>=10.0.0
+python-magic>=0.4.27
+
+# Monitoring and observability
+prometheus-client>=0.19.0
+structlog>=23.0.0
+
+# Development dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.25.2  # for testing
+
+# Code quality
+black>=23.12.0
+isort>=5.13.0
+ruff>=0.1.0
+mypy>=1.8.0
