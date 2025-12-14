@@ -2,11 +2,12 @@
 Database models for the video processing application.
 """
 
-from sqlmodel import SQLModel, Field, Column, String, DateTime, Text, JSON, Integer, Float, Boolean
-from typing import Optional, Dict, Any, List
-from enum import Enum
-from datetime import datetime, timedelta
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from sqlmodel import Column, DateTime, Field, Float, Integer, JSON, SQLModel, String, Text
 
 
 class JobStatus(str, Enum):

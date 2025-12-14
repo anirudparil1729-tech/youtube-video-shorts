@@ -2,10 +2,11 @@
 Database configuration and session management.
 """
 
-from sqlmodel import SQLModel, create_engine, Session
-from sqlalchemy.pool import StaticPool
-from typing import Generator
 import logging
+from typing import Generator
+
+from sqlalchemy.pool import StaticPool
+from sqlmodel import Session, SQLModel, create_engine
 
 from app.core.config import settings
 
@@ -17,7 +18,7 @@ if settings.database_url.startswith("sqlite"):
         settings.database_url,
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
-        echo=settings.debug
+        echo=settings.debug,
     )
 else:
     engine = create_engine(settings.database_url, echo=settings.debug)

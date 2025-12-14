@@ -2,11 +2,12 @@
 Pydantic schemas for API request/response models.
 """
 
-from pydantic import BaseModel, HttpUrl, Field, validator
-from typing import Optional, Dict, Any, List
-from enum import Enum
 from datetime import datetime
-from app.models.job_models import JobStatus, JobType, ProcessingStage, ClipMetadata
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field, HttpUrl, validator
+
+from app.models.job_models import JobStatus, JobType, ProcessingStage
 
 
 class JobSubmission(BaseModel):
@@ -15,10 +16,10 @@ class JobSubmission(BaseModel):
     job_type: JobType = Field(..., description="Type of processing job")
     priority: int = Field(default=0, ge=0, le=10, description="Job priority (0-10)")
     options: Optional[Dict[str, Any]] = Field(
-        default_factory=dict, 
-        description="Job-specific options"
+        default_factory=dict,
+        description="Job-specific options",
     )
-    
+
     @validator("youtube_url")
     def validate_youtube_url(cls, v):
         """Validate that the URL is a YouTube URL"""

@@ -2,11 +2,11 @@
 Application configuration management.
 """
 
-from pydantic import validator, AnyUrl
-from pydantic_settings import BaseSettings
-from typing import Optional, List
-import os
 from pathlib import Path
+from typing import List, Optional
+
+from pydantic import validator
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
