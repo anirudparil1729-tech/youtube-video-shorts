@@ -22,6 +22,7 @@ torchaudio>=2.0.0
 
 # Computer vision
 opencv-python-headless>=4.8.1
+mediapipe>=0.10.0
 
 # Async support
 asyncio-mqtt>=0.16.0

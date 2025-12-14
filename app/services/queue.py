@@ -15,7 +15,8 @@ from sqlmodel import Session, select
 
 from app.core.config import settings
 from app.db.database import engine
-from app.models.job_models import Job, JobEvent, JobStatus, WorkerStatus
+from app.models.job_models import Job, JobEvent, JobStatus, ProcessingStage, WorkerStatus
+from app.services.media_pipeline import MediaProcessingPipeline
 from app.services.simple_db import update_job
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,7 @@ class JobQueue:
         self.active_jobs: set[str] = set()
         self.job_subscribers: dict[str, set[asyncio.Queue[dict[str, Any]]]] = {}
         self._lock = asyncio.Lock()
+        self.pipeline: MediaProcessingPipeline | None = None
 
     async def start(self) -> None:
         if self.is_running:
@@ -37,6 +39,9 @@ class JobQueue:
 
         self.is_running = True
         logger.info("Starting job queue service...")
+
+        # Initialize media pipeline
+        self.pipeline = MediaProcessingPipeline(output_dir=settings.output_dir)
 
         for i in range(settings.max_concurrent_jobs):
             worker_id = f"worker-{i}"
@@ -113,33 +118,80 @@ class JobQueue:
             await self._update_worker_status(worker_id, "stopped")
 
     async def _process_job(self, worker_id: str, job_id: str) -> None:
-        """Simulate work and emit progress.
+        """Execute the real media processing pipeline.
 
-        Real implementations should execute the media pipeline described in docs.
+        This runs the complete video processing workflow including:
+        - URL validation and metadata extraction
+        - Video download
+        - Audio extraction
+        - Transcription (Whisper)
+        - NLP analysis
+        - Segment generation
+        - Video encoding and cropping
         """
 
-        stages: list[tuple[str, float, str]] = [
-            ("initializing", 10.0, "Initializing job..."),
-            ("downloading", 30.0, "Downloading video..."),
-            ("extracting_audio", 50.0, "Extracting audio..."),
-            ("transcribing", 70.0, "Transcribing audio..."),
-            ("analyzing", 85.0, "Analyzing content..."),
-            ("finalizing", 95.0, "Finalizing results..."),
-        ]
+        async def progress_callback(
+            stage: ProcessingStage, progress: float, message: str
+        ) -> None:
+            """Callback for pipeline progress updates."""
+            with Session(engine) as session:
+                job = session.get(Job, job_id)
+                if not job:
+                    return
+
+                job.progress = progress
+                job.updated_at = datetime.utcnow()
+                session.add(job)
+                session.commit()
+
+                session.add(
+                    JobEvent(
+                        job_id=job_id,
+                        event_type="progress",
+                        stage=stage.value,
+                        message=message,
+                        progress=progress,
+                        data={"stage": stage.value, "worker_id": worker_id},
+                    )
+                )
+                session.commit()
+
+            await self._notify_subscribers(job_id)
 
         try:
-            for stage, progress, message in stages:
-                if not self.is_running:
-                    break
+            with Session(engine) as session:
+                job = session.get(Job, job_id)
+                if not job:
+                    return
+                if job.status == JobStatus.CANCELLED:
+                    return
 
-                with Session(engine) as session:
-                    job = session.get(Job, job_id)
-                    if not job:
-                        return
-                    if job.status == JobStatus.CANCELLED:
-                        return
+            if not self.pipeline:
+                raise RuntimeError("Media pipeline not initialized")
 
-                    job.progress = progress
+            # Execute pipeline
+            result = await self.pipeline.process_job(
+                job_id=job_id,
+                youtube_url=job.youtube_url,
+                job_type=job.job_type.value,
+                options=job.options or {},
+                progress_callback=progress_callback,
+            )
+
+            # Update job with results
+            with Session(engine) as session:
+                job = session.get(Job, job_id)
+                if job:
+                    job.video_title = result.get("video_title")
+                    job.video_duration = result.get("video_duration")
+                    job.video_uploader = result.get("uploader")
+                    job.transcript = result.get("transcript")
+                    job.transcript_segments = result.get("transcript_segments")
+                    job.generated_clips = result.get("generated_clips")
+                    job.output_files = result.get("output_files")
+                    job.progress = 100.0
+                    job.status = JobStatus.COMPLETED
+                    job.completed_at = datetime.utcnow()
                     job.updated_at = datetime.utcnow()
                     session.add(job)
                     session.commit()
@@ -147,34 +199,44 @@ class JobQueue:
                     session.add(
                         JobEvent(
                             job_id=job_id,
-                            event_type="progress",
-                            stage=stage,
-                            message=message,
-                            progress=progress,
-                            data={"stage": stage, "worker_id": worker_id},
+                            event_type="completed",
+                            stage=ProcessingStage.COMPLETED.value,
+                            message="Processing complete!",
+                            progress=100.0,
+                            data={
+                                "clips_generated": result.get("clips_generated"),
+                                "worker_id": worker_id,
+                            },
                         )
                     )
                     session.commit()
 
-                await self._notify_subscribers(job_id)
-                await asyncio.sleep(0.05)
-
-            # Finalize as completed
-            update_job(
-                job_id,
-                status=JobStatus.COMPLETED,
-                progress=100.0,
-                completed_at=datetime.utcnow(),
-            )
-
         except Exception as e:
+            logger.exception("Job %s failed: %s", job_id, str(e))
+
+            with Session(engine) as session:
+                job = session.get(Job, job_id)
+                current_progress = job.progress if job else 0.0
+
             update_job(
                 job_id,
                 status=JobStatus.FAILED,
                 error_message=str(e),
                 completed_at=datetime.utcnow(),
             )
-            logger.exception("Job %s failed", job_id)
+
+            with Session(engine) as session:
+                session.add(
+                    JobEvent(
+                        job_id=job_id,
+                        event_type="failed",
+                        stage=ProcessingStage.FINALIZING.value,
+                        message=f"Job failed: {str(e)}",
+                        progress=current_progress,
+                        data={"error": str(e), "worker_id": worker_id},
+                    )
+                )
+                session.commit()
 
         finally:
             async with self._lock:
