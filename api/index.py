@@ -106,6 +106,14 @@ def create_serverless_app():
     from main import app
     from fastapi import FastAPI
     from fastapi.middleware.cors import CORSMiddleware
+    from sqlmodel import Session
+
+    from app.db.database import engine, init_db
+    from app.services.tasks import seed_default_categories
+
+    init_db()
+    with Session(engine) as session:
+        seed_default_categories(session)
     
     # Create serverless-specific app
     serverless_app = FastAPI(
