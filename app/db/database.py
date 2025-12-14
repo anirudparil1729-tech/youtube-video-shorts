@@ -27,6 +27,11 @@ else:
 def init_db() -> None:
     """Initialize database tables"""
     logger.info("Initializing database...")
+
+    # Import models so they are registered with SQLModel metadata.
+    import app.models.job_models  # noqa: F401
+    import app.models.task_models  # noqa: F401
+
     SQLModel.metadata.create_all(engine)
     logger.info("Database initialized successfully")
 

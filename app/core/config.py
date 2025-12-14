@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "your-secret-key-change-in-production"
     access_token_expire_minutes: int = 30
+    app_password: str = "dev-password"
     
     # Rate Limiting
     requests_per_minute: int = 60

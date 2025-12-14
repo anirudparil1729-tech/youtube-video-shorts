@@ -28,6 +28,18 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, HttpUrl, field_validator
+from sqlmodel import Session
+
+from app.api.v1.routes.sync import router as sync_router
+from app.api.v1.routes.tasks import (
+    categories_router,
+    reminders_router,
+    subtasks_router,
+    tasks_router,
+    time_blocks_router,
+)
+from app.db.database import engine, init_db
+from app.services.tasks import seed_default_categories
 
 
 # Simple in-memory job storage for demonstration
@@ -183,6 +195,10 @@ async def process_job(job_id: str) -> None:
 async def lifespan(_: FastAPI):
     """Application lifespan management."""
 
+    init_db()
+    with Session(engine) as session:
+        seed_default_categories(session)
+
     logging.info("Starting Video Processing API...")
 
     for i in range(3):
@@ -224,6 +240,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(categories_router, prefix="/api/v1")
+app.include_router(tasks_router, prefix="/api/v1")
+app.include_router(subtasks_router, prefix="/api/v1")
+app.include_router(reminders_router, prefix="/api/v1")
+app.include_router(time_blocks_router, prefix="/api/v1")
+app.include_router(sync_router, prefix="/api/v1")
 
 
 @app.get("/")
